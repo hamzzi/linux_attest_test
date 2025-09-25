@@ -1,0 +1,140 @@
+name: Build Linux Kernel bzImage
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          build-essential \
+          bc \
+          bison \
+          flex \
+          libssl-dev \
+          libelf-dev \
+          dwarves \
+          zstd \
+          libncurses-dev \
+          ccache \
+          rsync
+
+    - name: Setup ccache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: defconfig-${{ github.sha }}
+        max-size: 2G
+
+    - name: Configure kernel
+      run: |
+        make defconfig
+        echo "Kernel configuration completed: defconfig"
+
+    - name: Build kernel
+      run: |
+        # Use ccache to speed up builds
+        export CC="ccache gcc"
+        export CCACHE_COMPRESS=1
+        export CCACHE_MAXSIZE=2G
+        
+        # Build bzImage with parallel jobs
+        make -j$(nproc) bzImage
+        
+        echo "Kernel build completed"
+        echo "bzImage location: $(find . -name bzImage -type f)"
+        echo "bzImage size: $(stat -c%s arch/x86/boot/bzImage) bytes"
+
+    - name: Upload bzImage artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: bzImage-defconfig-${{ github.sha }}
+        path: arch/x86/boot/bzImage
+        retention-days: 30
+
+    - name: Upload System.map artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: System.map-defconfig-${{ github.sha }}
+        path: System.map
+        retention-days: 30
+
+    - name: Upload config artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: config-defconfig-${{ github.sha }}
+        path: .config
+        retention-days: 30
+
+    - name: Attest build provenance
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: arch/x86/boot/bzImage
+        subject-name: bzImage-defconfig-${{ github.sha }}
+        push-to-registry: false
+
+    - name: Build info
+      run: |
+        echo "=== Build Information ==="
+        echo "Kernel Version: $(make kernelversion)"
+        echo "Build Config: defconfig"
+        echo "Build Date: $(date)"
+        echo "Build Host: $(hostname)"
+        echo "Git Commit: ${{ github.sha }}"
+        echo "Git Branch: ${{ github.ref_name }}"
+        
+        echo ""
+        echo "=== File Sizes ==="
+        echo "bzImage: $(stat -c%s arch/x86/boot/bzImage) bytes"
+        echo "System.map: $(stat -c%s System.map) bytes"
+        echo ".config: $(stat -c%s .config) bytes"
+        
+        echo ""
+        echo "=== bzImage Details ==="
+        file arch/x86/boot/bzImage
+        ls -la arch/x86/boot/bzImage
+
+  build-summary:
+    needs: build-kernel
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Generate build summary
+      run: |
+        echo "# Linux Kernel Build Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Build Information" >> $GITHUB_STEP_SUMMARY
+        echo "- **Repository:** ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Date:** $(date)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Build Configurations" >> $GITHUB_STEP_SUMMARY
+        
+        # Add status for each configuration
+        echo "- **defconfig:** ${{ needs.build-kernel.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "## Artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "The following artifacts are available for download:" >> $GITHUB_STEP_SUMMARY
+        echo "- bzImage (compressed kernel image)" >> $GITHUB_STEP_SUMMARY
+        echo "- System.map (kernel symbol table)" >> $GITHUB_STEP_SUMMARY
+        echo "- .config (kernel configuration file)" >> $GITHUB_STEP_SUMMARY
