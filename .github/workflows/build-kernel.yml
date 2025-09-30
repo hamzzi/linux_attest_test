@@ -55,6 +55,10 @@ jobs:
         export CC="ccache gcc"
         export CCACHE_COMPRESS=1
         export CCACHE_MAXSIZE=2G
+
+        export KBUILD_BUILD_TIMESTAMP="2025-09-30T00:00:00+0000"
+        export KBUILD_BUILD_USER="username"
+        export KBUILD_BUILD_HOST="hostname"
         
         # Build bzImage with parallel jobs
         make -j$(nproc) bzImage
