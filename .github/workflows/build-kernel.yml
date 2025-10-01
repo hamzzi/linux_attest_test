@@ -62,6 +62,7 @@ jobs:
         export SOURCE_DATE_EPOCH=$(date -d "$(git show -s --format=%cI HEAD)" +%s)
         export KERNELVERSION=6.17.0-rc7
         export KCFLAGS="-fdebug-prefix-map=OLD=NEW"
+        export KBUILD_BUILD_VERSION=0
         
         # Build bzImage with parallel jobs
         make -j$(nproc) bzImage
