@@ -56,9 +56,11 @@ jobs:
         export CCACHE_COMPRESS=1
         export CCACHE_MAXSIZE=2G
 
-        export KBUILD_BUILD_TIMESTAMP="2025-09-30T00:00:00+0000"
-        export KBUILD_BUILD_USER="username"
-        export KBUILD_BUILD_HOST="hostname"
+        export KBUILD_BUILD_TIMESTAMP=$(git show -s --format=%cI HEAD)
+        export KBUILD_BUILD_USER=$(git show -s --format='%an <%ae>' HEAD)
+        export KBUILD_BUILD_HOST=action
+        export SOURCE_DATE_EPOCH=$(date -d "$(git show -s --format=%cI HEAD)" +%s)  
+        export KERNELVERSION=6.17.0-rc7
         
         # Build bzImage with parallel jobs
         make -j$(nproc) bzImage
