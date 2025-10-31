@@ -91,10 +91,15 @@ jobs:
         path: .config
         retention-days: 30
 
+    - name: Calculate artifact digests
+      run: |
+        shasum -a arch/x86/boot/bzImage > subject.checksums.txt
+
     - name: Attest build provenance
-      uses: actions/attest-build-provenance@v1
+      uses: actions/attest-build-provenance@v3
       with:
-        subject-path: arch/x86/boot/bzImage
+        # subject-path: arch/x86/boot/bzImage
+        subject-checksums: subject.checksums.txt
         subject-name: bzImage-defconfig-${{ github.sha }}
         push-to-registry: false
 
