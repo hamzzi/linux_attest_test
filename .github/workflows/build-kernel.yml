@@ -93,7 +93,7 @@ jobs:
 
     - name: Calculate artifact digests
       run: |
-        shasum -a arch/x86/boot/bzImage > subject.checksums.txt
+        shasum -a 384 arch/x86/boot/bzImage > subject.checksums.txt
 
     - name: Attest build provenance
       uses: actions/attest-build-provenance@v3
